@@ -117,12 +117,14 @@ typedef struct
     BOOLEAN sbc_offload;
     BOOLEAN aptx_offload;
     BOOLEAN aac_offload;
+    BOOLEAN aptxhd_offload;
 } btif_av_a2dp_offloaded_codec_cap_t;
 
 typedef enum {
     SBC,
     APTX,
     AAC,
+    APTXHD,
 }btif_av_codec_list;
 
 /*****************************************************************************
@@ -299,6 +301,7 @@ const char *dump_av_codec_name(btif_av_codec_list codec)
         CASE_RETURN_STR(SBC)
         CASE_RETURN_STR(APTX)
         CASE_RETURN_STR(AAC)
+        CASE_RETURN_STR(APTXHD)
         default: return "UNKNOWN_CODEC";
     }
 }
@@ -2247,6 +2250,11 @@ static void a2dp_offload_codec_cap_parser(const char *value)
             BTIF_TRACE_ERROR("%s: AAC offload supported",__func__);
             btif_av_codec_offload.aac_offload = TRUE;
         }
+        else if (strcmp(tok,"aptxhd") == 0)
+        {
+            BTIF_TRACE_ERROR("%s: APTXHD offload supported",__func__);
+            btif_av_codec_offload.aptxhd_offload = TRUE;
+        }
         tok = strtok_r(NULL, "-", &tmp_token);
     };
 }
@@ -2973,6 +2981,9 @@ bt_status_t btif_av_execute_service(BOOLEAN b_enable)
 *******************************************************************************/
 bt_status_t btif_av_sink_execute_service(BOOLEAN b_enable)
 {
+     int i;
+     BTIF_TRACE_IMP("%s: enable: %d", __FUNCTION__, b_enable);
+
      if (b_enable)
      {
          /* Added BTA_AV_FEAT_NO_SCO_SSPD - this ensures that the BTA does not
@@ -2986,9 +2997,20 @@ bt_status_t btif_av_sink_execute_service(BOOLEAN b_enable)
                                                                 UUID_SERVCLASS_AUDIO_SINK);
      }
      else {
-         BTA_AvDeregister(btif_av_cb[0].bta_handle);
-         BTA_AvDisable();
+         /* Also shut down the AV state machine */
+        for (i = 0; i < btif_max_av_clients; i++ )
+        {
+            if (btif_av_cb[i].sm_handle != NULL)
+            {
+                BTIF_TRACE_IMP("%s: shutting down AV SM", __FUNCTION__);
+                btif_sm_shutdown(btif_av_cb[i].sm_handle);
+                btif_av_cb[i].sm_handle = NULL;
+            }
+        }
+        BTA_AvDeregister(btif_av_cb[0].bta_handle);
+        BTA_AvDisable();
      }
+     BTIF_TRACE_IMP("%s: enable: %d completed", __FUNCTION__, b_enable);
      return BT_STATUS_SUCCESS;
 }
 
@@ -3479,6 +3501,19 @@ BOOLEAN btif_av_get_ongoing_multicast()
 
 /******************************************************************************
 **
+** Function        btif_av_is_multicast_supported
+**
+** Description     Returns TRUE if multicast is supported
+**
+** Returns         BOOLEAN
+******************************************************************************/
+BOOLEAN btif_av_is_multicast_supported()
+{
+    return is_multicast_supported;
+}
+
+/******************************************************************************
+**
 ** Function        btif_av_is_offload_supported
 **
 ** Description     Returns split mode status
@@ -3618,10 +3653,13 @@ BOOLEAN btif_av_is_codec_offload_supported(int codec)
         case AAC:
             ret = btif_av_codec_offload.aac_offload;
             break;
+        case APTXHD:
+            ret = btif_av_codec_offload.aptxhd_offload;
+            break;
         default:
             ret = FALSE;
     }
-    BTIF_TRACE_DEBUG("btif_av_is_codec_offload_supported %s code supported = %d",dump_av_codec_name(codec),ret);
+    BTIF_TRACE_DEBUG("btif_av_is_codec_offload_supported %s codec supported = %d",dump_av_codec_name(codec),ret);
     return ret;
 }
 
