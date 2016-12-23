@@ -575,8 +575,6 @@ static void event_command_ready(fixed_queue_t *queue, UNUSED_ATTR void *context)
 
     packet_fragmenter->fragment_and_dispatch(wait_entry->command);
 
-
-
     update_command_response_timer();
   }
 }
