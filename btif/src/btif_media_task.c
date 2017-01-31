@@ -1192,16 +1192,18 @@ static void btif_a2dp_encoder_init(tBTA_AV_HNDL hdl)
 {
     UINT16 minmtu;
     tBTIF_MEDIA_INIT_AUDIO msg;
-    tA2D_SBC_CIE sbc_config;
     tA2D_APTX_CIE* codecInfo = 0;
 #if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
     tA2D_AAC_CIE aac_config;
-#endif
+#else
+    tA2D_SBC_CIE sbc_config;
+
     /* lookup table for converting channel mode */
     UINT16 codec_mode_tbl[5] = { SBC_JOINT_STEREO, SBC_STEREO, SBC_DUAL, 0, SBC_MONO };
 
     /* lookup table for converting number of blocks */
     UINT16 codec_block_tbl[5] = { 16, 12, 8, 0, 4 };
+#endif
 
     /* lookup table to convert freq */
     UINT16 freq_block_tbl[5] = { SBC_sf48000, SBC_sf44100, SBC_sf32000, 0, SBC_sf16000 };
@@ -1269,20 +1271,15 @@ static void btif_a2dp_encoder_init(tBTA_AV_HNDL hdl)
 
 
 #if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
-    if (BTIF_AV_CODEC_M24 == codectype) {
-        ALOGI("%s Selected Codec AAC", __func__);
-        bta_av_co_audio_get_codec_config ((UINT8*)&aac_config, &minmtu, BTIF_AV_CODEC_M24);
-        msg.ObjectType = aac_config.object_type;
-        msg.ChannelMode = (aac_config.channels == A2D_AAC_IE_CHANNELS_2) ? SBC_STEREO : SBC_MONO;
-        msg.SamplingFreq =  freq_block_tbl[aac_config.samp_freq >> 5];
-        msg.MtuSize = minmtu;
-        msg.CodecType = BTIF_AV_CODEC_M24;
-        msg.bit_rate = aac_config.bit_rate;
-        btif_media_task_enc_init_req(&msg);
-        return;
-    }
-#endif
+    ALOGI("%s Selected Codec AAC", __func__);
 
+    bta_av_co_audio_get_codec_config ((UINT8*)&aac_config, &minmtu, BTIF_AV_CODEC_M24);
+    msg.ObjectType = aac_config.object_type;
+    msg.ChannelMode = (aac_config.channels == A2D_AAC_IE_CHANNELS_2) ? SBC_STEREO : SBC_MONO;
+    msg.SamplingFreq =  freq_block_tbl[aac_config.samp_freq >> 5];
+    msg.CodecType = BTIF_AV_CODEC_M24;
+    msg.bit_rate = aac_config.bit_rate;
+#else
     ALOGI("%s Selected Codec SBC", __func__);
 
     /* Retrieve the current SBC configuration (default if currently not used) */
@@ -1292,12 +1289,13 @@ static void btif_a2dp_encoder_init(tBTA_AV_HNDL hdl)
     msg.AllocationMethod = (sbc_config.alloc_mthd == A2D_SBC_IE_ALLOC_MD_L) ? SBC_LOUDNESS : SBC_SNR;
     msg.ChannelMode = codec_mode_tbl[sbc_config.ch_mode >> 1];
     msg.SamplingFreq = freq_block_tbl[sbc_config.samp_freq >> 5];
-    msg.MtuSize = minmtu;
     msg.CodecType = BTIF_AV_CODEC_SBC;
 
     APPL_TRACE_EVENT("msg.ChannelMode %x", msg.ChannelMode);
+#endif
+    msg.MtuSize = minmtu;
 
-    /* Init the media task to encode SBC properly */
+    /* Init the media task to encode audio properly */
     btif_media_task_enc_init_req(&msg);
 }
 
