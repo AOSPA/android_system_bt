@@ -2293,13 +2293,17 @@ BOOLEAN bta_av_co_audio_set_codec(const tBTIF_AV_MEDIA_FEEDINGS *p_feeding, tBTI
         break;
     }
 
-    /* The new config was correctly built. The default codec is set to be SBC */
+    /* The new config was correctly built */
     bta_av_co_cb.codec_cfg_sbc = new_cfg_sbc;
-    bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_sbc;
     bta_av_co_cb.codec_cfg_aptx= new_cfg_aptx;
     bta_av_co_cb.codec_cfg_aptx_hd = new_cfg_aptx_hd;
 #if defined(AAC_ENCODER_INCLUDED) && (AAC_ENCODER_INCLUDED == TRUE)
+    /* The default codec is set to be AAC */
     bta_av_co_cb.codec_cfg_aac = new_cfg_aac;
+    bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_aac;
+#else
+    /* The default codec is set to be SBC */
+    bta_av_co_cb.codec_cfg = &bta_av_co_cb.codec_cfg_sbc;
 #endif
 
     /* Check all devices support it */
