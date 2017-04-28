@@ -31,7 +31,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <cutils/properties.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bt_av.h>
 #include <hardware/bt_gatt.h>
@@ -72,7 +71,6 @@
 #include "btif/include/btif_media.h"
 #include "l2cdefs.h"
 #include "l2c_api.h"
-#include "stack_config.h"
 
 #if TEST_APP_INTERFACE == TRUE
 #include <bt_testapp.h>
@@ -203,9 +201,6 @@ static int disable(void) {
 
 static void cleanup(void) {
   stack_manager_get_interface()->clean_up_stack();
-
-  if(bt_logger_enabled)
-    property_set("bluetooth.startbtlogger", "false");
 }
 
 bool is_restricted_mode() {

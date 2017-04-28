@@ -147,7 +147,6 @@ static void event_start_up_stack(UNUSED_ATTR void *context) {
 
   ensure_stack_is_initialized();
 
-  init_vnd_Logger();
 #ifdef BLUEDROID_DEBUG
   uint16_t logging_pref;
   logging_pref = get_logging_pref();
@@ -229,8 +228,7 @@ static void event_clean_up_stack(void *context) {
   module_management_stop();
   LOG_INFO(LOG_TAG, "%s finished", __func__);
 
-cleanup:
-  clean_vnd_logger();
+cleanup:;
   semaphore_t *semaphore = (semaphore_t *)context;
   if (semaphore)
     semaphore_post(semaphore);
