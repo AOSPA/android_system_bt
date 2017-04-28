@@ -106,7 +106,7 @@ static future_t *start_up(void) {
 static future_t *shut_down(void) {
   module_started = false;
   if (hci_ext_dump_enabled == true) {
-    STOP_SNOOP_LOGGING();
+    property_set("bluetooth.startbtsnoop", "false");
   }
   update_logging();
 
@@ -198,7 +198,7 @@ static void update_logging() {
 #endif
     {
       if (logging_enabled_via_api || hci_ext_dump_enabled == true) {
-        START_SNOOP_LOGGING();
+        property_set("bluetooth.startbtsnoop", "true");
       }
     }
 
