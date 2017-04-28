@@ -31,7 +31,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <cutils/properties.h>
 #include <hardware/bluetooth.h>
 #include <hardware/bt_av.h>
 #include <hardware/bt_gatt.h>
@@ -52,7 +51,6 @@
 #include "bt_utils.h"
 #include "btif_api.h"
 #include "btif_common.h"
-#include "device/include/controller.h"
 #include "btif_debug.h"
 #include "btsnoop.h"
 #include "btsnoop_mem.h"
@@ -72,7 +70,6 @@
 #include "btif/include/btif_media.h"
 #include "l2cdefs.h"
 #include "l2c_api.h"
-#include "stack_config.h"
 
 #if TEST_APP_INTERFACE == TRUE
 #include <bt_testapp.h>
@@ -138,13 +135,6 @@ extern const btsmp_interface_t *btif_smp_get_interface(void);
 extern const btgap_interface_t *btif_gap_get_interface(void);
 #endif
 
-extern void set_logging_pref(uint16_t pref_val);
-#ifdef BLUEDROID_DEBUG
-extern void enable_bt_logger_debug(bool);
-#else
-extern void enable_bt_logger(bool);
-#endif
-
 /************************************************************************************
 **  Functions
 ************************************************************************************/
@@ -203,9 +193,6 @@ static int disable(void) {
 
 static void cleanup(void) {
   stack_manager_get_interface()->clean_up_stack();
-
-  if(bt_logger_enabled)
-    property_set("bluetooth.startbtlogger", "false");
 }
 
 bool is_restricted_mode() {
@@ -519,7 +506,7 @@ int hci_cmd_send(uint16_t opcode, uint8_t* buf, uint8_t len)
     ALOGI("hci_cmd_send");
 
     /* sanity check */
-    if (interface_ready() == FALSE || stack_manager_get_interface()->get_stack_is_running() == FALSE)
+    if (interface_ready() == FALSE)
         return BT_STATUS_NOT_READY;
 
     return btif_hci_cmd_send(opcode, buf, len);
@@ -546,15 +533,7 @@ int config_hci_snoop_log(uint8_t enable)
     if (!interface_ready())
         return BT_STATUS_NOT_READY;
 
-#ifdef BLUEDROID_DEBUG
-    enable_bt_logger_debug(enable);
-#else
-    enable_bt_logger(enable);
-#endif
-
     btsnoop_get_interface()->set_api_wants_to_log(enable);
-    controller_get_static_interface()->enable_soc_logging(enable);
-
     return BT_STATUS_SUCCESS;
 }
 

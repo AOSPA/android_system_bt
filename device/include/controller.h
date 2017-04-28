@@ -29,10 +29,6 @@
 
 static const char CONTROLLER_MODULE[] = "controller_module";
 
-typedef struct controller_static_t {
-  void (*enable_soc_logging) (bool value);
-} controller_static_t;
-
 typedef struct controller_t {
   bool (*get_is_ready)(void);
 
@@ -88,8 +84,6 @@ typedef struct controller_t {
   uint8_t (*get_ble_adv_ext_size)(void);
   void (*set_ble_adv_ext_size)(int adv_ext_size);
 } controller_t;
-
-const controller_static_t *controller_get_static_interface();
 
 const controller_t *controller_get_interface();
 

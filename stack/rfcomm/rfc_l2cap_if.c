@@ -112,7 +112,6 @@ void RFCOMM_ConnectInd (BD_ADDR bd_addr, UINT16 lcid, UINT16 psm, UINT8 id)
             alarm_set_on_queue(p_mcb->mcb_timer, interval_ms,
                        rfcomm_mcb_timer_timeout, p_mcb,
                        btu_general_alarm_queue);
-            GENERATE_VENDOR_LOGS();
             return;
         }
         else

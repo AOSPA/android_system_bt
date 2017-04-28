@@ -21,7 +21,6 @@
 #include "stack_manager.h"
 
 #include <hardware/bluetooth.h>
-#include <cutils/properties.h>
 
 #include "btcore/include/module.h"
 #include "btcore/include/osi_module.h"
@@ -53,13 +52,6 @@ static void event_clean_up_stack(void *context);
 
 static void event_signal_stack_up(void *context);
 static void event_signal_stack_down(void *context);
-
-extern void btif_vendor_snooplog_status_event(UINT16, char *p_param);
-extern void set_logging_pref(uint16_t pref_val);
-
-#ifdef BLUEDROID_DEBUG
-extern uint16_t get_logging_pref();
-#endif
 
 // Unvetted includes/imports, etc which should be removed or vetted in the future
 static future_t *hack_future;
@@ -147,18 +139,6 @@ static void event_start_up_stack(UNUSED_ATTR void *context) {
 
   ensure_stack_is_initialized();
 
-  init_vnd_Logger();
-#ifdef BLUEDROID_DEBUG
-  uint16_t logging_pref;
-  logging_pref = get_logging_pref();
-
-  if(logging_pref != DEV_OPT_PREFERENCE) {
-    btif_transfer_context(btif_vendor_snooplog_status_event, bt_logger_enabled,
-                NULL, 0, NULL);
-    set_logging_pref(bt_logger_enabled);
-  }
-#endif
-
   LOG_INFO(LOG_TAG, "%s is bringing up the stack", __func__);
   future_t *local_hack_future = future_new();
   hack_future = local_hack_future;
@@ -229,8 +209,7 @@ static void event_clean_up_stack(void *context) {
   module_management_stop();
   LOG_INFO(LOG_TAG, "%s finished", __func__);
 
-cleanup:
-  clean_vnd_logger();
+cleanup:;
   semaphore_t *semaphore = (semaphore_t *)context;
   if (semaphore)
     semaphore_post(semaphore);
