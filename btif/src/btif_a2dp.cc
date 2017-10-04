@@ -40,8 +40,10 @@
 #endif /* ENABLE_SPLIT_A2DP */
 #include "btif_hf.h"
 
+#ifdef ENABLE_SPLIT_A2DP
 extern bool btif_a2dp_audio_if_init;
 extern void btif_av_reset_reconfig_flag();
+#endif /* ENABLE_SPLIT_A2DP */
 
 void btif_a2dp_on_idle(int index) {
   APPL_TRACE_EVENT("## ON A2DP IDLE ## peer_sep = %d", btif_av_get_peer_sep(index));
@@ -138,20 +140,13 @@ void btif_a2dp_on_stopped(tBTA_AV_SUSPEND* p_av_suspend) {
     else
         APPL_TRACE_EVENT("btif_a2dp_on_stopped, audio interface not up");
   }
-#else /* ENABLE_SPLIT_A2DP */
-  if (btif_a2dp_audio_if_init) {
-    if (p_av_suspend != NULL)
-      btif_a2dp_audio_on_stopped(p_av_suspend->status);
-  }
-  else
-      APPL_TRACE_EVENT("btif_a2dp_on_stopped, audio interface not up");
 #endif /* ENABLE_SPLIT_A2DP */
 }
 
 void btif_a2dp_on_suspended(tBTA_AV_SUSPEND* p_av_suspend) {
   APPL_TRACE_EVENT("## ON A2DP SUSPENDED ##");
-  int idx = btif_av_get_latest_playing_device_idx();
 #ifdef ENABLE_SPLIT_A2DP
+  int idx = btif_av_get_latest_playing_device_idx();
   if (!btif_av_is_split_a2dp_enabled()) {
     if (btif_av_get_peer_sep(idx) == AVDT_TSEP_SRC) {
       btif_a2dp_sink_on_suspended(p_av_suspend);
@@ -162,9 +157,6 @@ void btif_a2dp_on_suspended(tBTA_AV_SUSPEND* p_av_suspend) {
      if (p_av_suspend != NULL)
        btif_a2dp_audio_on_suspended(p_av_suspend->status);
   }
-#else /* ENABLE_SPLIT_A2DP */
-   if (p_av_suspend != NULL)
-     btif_a2dp_audio_on_suspended(p_av_suspend->status);
 #endif /* ENABLE_SPLIT_A2DP */
 }
 
