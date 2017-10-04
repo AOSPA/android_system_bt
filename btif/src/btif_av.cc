@@ -151,10 +151,12 @@ static alarm_t *av_coll_detected_timer = NULL;
 static bool isA2dpSink = false;
 
 /*SPLITA2DP */
+#ifdef ENABLE_SPLIT_A2DP
 bool bt_split_a2dp_enabled = false;
 bool reconfig_a2dp = false;
 bool btif_a2dp_audio_if_init = false;
 bool codec_cfg_change = false;
+#endif /* ENABLE_SPLIT_A2DP */
 /*SPLITA2DP */
 /* both interface and media task needs to be ready to alloc incoming request */
 #define CHECK_BTAV_INIT()                                                    \
@@ -1645,11 +1647,6 @@ static bool btif_av_state_started_handler(btif_sm_event_t event, void* p_data,
           btif_a2dp_audio_interface_deinit();
         }
       }
-#else /* ENABLE_SPLIT_A2DP */
-      if (btif_a2dp_audio_if_init) {
-        btif_a2dp_audio_if_init = false;
-        btif_a2dp_audio_interface_deinit();
-      }
 #endif /* ENABLE_SPLIT_A2DP */
       // inform the application that we are disconnecting
       btif_report_connection_state(BTAV_CONNECTION_STATE_DISCONNECTING, &(btif_av_cb[index].peer_bda));
@@ -1875,10 +1872,12 @@ static void btif_av_handle_event(uint16_t event, char* p_param) {
     case BTIF_AV_CLEANUP_REQ_EVT: // Clean up to be called on default index
       BTIF_TRACE_DEBUG("%s: BTIF_AV_CLEANUP_REQ_EVT", __func__);
       uuid = (int)*p_param;
+#ifdef ENABLE_SPLIT_A2DP
       if (btif_a2dp_audio_if_init) {
         btif_a2dp_audio_if_init = false;
         btif_a2dp_audio_interface_deinit();
       }
+#endif /* ENABLE_SPLIT_A2DP */
       if (uuid == BTA_A2DP_SOURCE_SERVICE_ID) {
         if (bt_av_src_callbacks) {
           bt_av_src_callbacks = NULL;
