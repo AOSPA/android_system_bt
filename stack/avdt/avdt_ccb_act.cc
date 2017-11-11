@@ -138,6 +138,27 @@ void avdt_ccb_chk_close(tAVDT_CCB* p_ccb, UNUSED_ATTR tAVDT_CCB_EVT* p_data) {
 
 /*******************************************************************************
  *
+ * Function         avdt_ccb_get_num_allocated_seps
+ *
+ * Description      This function will return num of seps allocated
+ *
+ * Returns          int
+ *
+ ******************************************************************************/
+static int avdt_ccb_get_num_allocated_seps() {
+  tAVDT_SCB* p_scb = &avdt_cb.scb[0];
+  int num_seps = 0;
+  /* Num allocated SEPs vary between split and non-split mode
+   * based on codecs supported
+   */
+  for(int i = 0; i < AVDT_NUM_SEPS; i++, p_scb++) {
+    if (p_scb->allocated) num_seps++;
+  }
+  AVDT_TRACE_WARNING("%s:num seps allocated = %d",__func__,num_seps);
+  return num_seps;
+}
+/*******************************************************************************
+ *
  * Function         avdt_ccb_hdl_discover_cmd
  *
  * Description      This function is called when a discover command is
@@ -154,9 +175,17 @@ void avdt_ccb_hdl_discover_cmd(tAVDT_CCB* p_ccb, tAVDT_CCB_EVT* p_data) {
   tAVDT_SCB* p_scb = &avdt_cb.scb[0];
   int i;
   bt_bdaddr_t remote_bdaddr;
+  int num_conn = avdt_scb_get_max_av_client();
+  //int num_codecs = AVDT_NUM_SEPS / num_conn;
+  int num_codecs = ((avdt_ccb_get_num_allocated_seps()) / num_conn);
+  int effective_num_seps = 0;
+
   bdcpy(remote_bdaddr.address, p_ccb->peer_addr);
   p_data->msg.discover_rsp.p_sep_info = sep_info;
   p_data->msg.discover_rsp.num_seps = 0;
+
+  AVDT_TRACE_WARNING("%s: total connections: %d, total codecs: %d",
+      __func__, num_conn, num_codecs);
 
     /* If this ccb, has done setconf and is doing discover again
      * we should show SEP for which setconfig was done earlier
@@ -178,7 +207,10 @@ void avdt_ccb_hdl_discover_cmd(tAVDT_CCB* p_ccb, tAVDT_CCB_EVT* p_data) {
   p_scb = &avdt_cb.scb[0];
   /* for all allocated scbs */
   for (i = 0; i < AVDT_NUM_SEPS; i++, p_scb++) {
+    if (effective_num_seps == num_codecs)
+      break;
     if ((p_scb->allocated) && (!p_scb->in_use)) {
+       effective_num_seps++;
        if (p_scb->cs.cfg.codec_info[AVDT_CODEC_TYPE_INDEX] == A2DP_MEDIA_CT_AAC &&
            interop_match_addr(INTEROP_DISABLE_AAC_CODEC, &remote_bdaddr)) {
           AVDT_TRACE_EVENT("%s: skipping AAC advertise\n", __func__);
@@ -193,6 +225,8 @@ void avdt_ccb_hdl_discover_cmd(tAVDT_CCB* p_ccb, tAVDT_CCB_EVT* p_data) {
       p_data->msg.discover_rsp.num_seps++;
     }
   }
+
+  AVDT_TRACE_WARNING("%s: effective number of endpoints: %d", __func__, effective_num_seps);
   /* send response */
   avdt_ccb_event(p_ccb, AVDT_CCB_API_DISCOVER_RSP_EVT, p_data);
 }
@@ -776,9 +810,8 @@ void avdt_ccb_ret_cmd(tAVDT_CCB* p_ccb, tAVDT_CCB_EVT* p_data) {
     /* command failed */
     p_ccb->ret_count = 0;
     avdt_ccb_cmd_fail(p_ccb, (tAVDT_CCB_EVT*)&err_code);
-
+    avdt_ccb_do_disconn(p_ccb, p_data);
     /* go to next queued command */
-    avdt_ccb_snd_cmd(p_ccb, p_data);
   } else {
     /* if command pending and we're not congested and not sending a fragment */
     if ((!p_ccb->cong) && (p_ccb->p_curr_msg == NULL) &&

@@ -244,8 +244,8 @@ static const uint8_t bta_av_sst_opening[][BTA_AV_NUM_COLS] = {
                                  BTA_AV_OPENING_SST},
     /* SDP_DISC_OK_EVT */ {BTA_AV_CONNECT_REQ, BTA_AV_SIGNORE,
                            BTA_AV_OPENING_SST},
-    /* SDP_DISC_FAIL_EVT */ {BTA_AV_CONNECT_REQ, BTA_AV_SIGNORE,
-                             BTA_AV_OPENING_SST},
+    /* SDP_DISC_FAIL_EVT */ {BTA_AV_SDP_FAILED, BTA_AV_SIGNORE,
+                             BTA_AV_INIT_SST},
     /* STR_DISC_OK_EVT */ {BTA_AV_DISC_RESULTS, BTA_AV_SIGNORE,
                            BTA_AV_OPENING_SST},
     /* STR_DISC_FAIL_EVT */ {BTA_AV_OPEN_FAILED, BTA_AV_SIGNORE,
@@ -403,8 +403,8 @@ static const uint8_t bta_av_sst_rcfg[][BTA_AV_NUM_COLS] = {
 static const uint8_t bta_av_sst_closing[][BTA_AV_NUM_COLS] = {
     /* Event                     Action 1               Action 2 Next state */
     /* AP_OPEN_EVT */ {BTA_AV_SIGNORE, BTA_AV_SIGNORE, BTA_AV_CLOSING_SST},
-    /* AP_CLOSE_EVT */ {BTA_AV_DISCONNECT_REQ, BTA_AV_SIGNORE,
-                        BTA_AV_CLOSING_SST},
+    /* AP_CLOSE_EVT */ {BTA_AV_STR_CLOSED, BTA_AV_SIGNORE,
+                        BTA_AV_INIT_SST},
     /* AP_START_EVT */ {BTA_AV_SIGNORE, BTA_AV_SIGNORE, BTA_AV_CLOSING_SST},
     /* AP_STOP_EVT */ {BTA_AV_SIGNORE, BTA_AV_SIGNORE, BTA_AV_CLOSING_SST},
     /* API_RECONFIG_EVT */ {BTA_AV_SIGNORE, BTA_AV_SIGNORE, BTA_AV_CLOSING_SST},
@@ -532,7 +532,8 @@ void bta_av_ssm_execute(tBTA_AV_SCB* p_scb, uint16_t event,
     }
   }
 
-  APPL_TRACE_IMP("%s(): AV Sevent(0x%x)=0x%x(%s) state=%d(%s)", __func__,
+  if ((event != BTA_AV_STR_WRITE_CFM_EVT) && (event != BTA_AV_SRC_DATA_READY_EVT))
+      APPL_TRACE_IMP("%s(): AV Sevent(0x%x)=0x%x(%s) state=%d(%s)", __func__,
                      p_scb->hndl, event, bta_av_evt_code(event), p_scb->state,
                      bta_av_sst_code(p_scb->state));
 

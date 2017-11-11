@@ -52,6 +52,9 @@ typedef enum {
   BTIF_AV_SINK_CONFIG_REQ_EVT,
   BTIF_AV_OFFLOAD_START_REQ_EVT,
   BTIF_AV_CLEANUP_REQ_EVT,
+  BTIF_AV_REMOTE_SUSPEND_STREAM_REQ_EVT,
+  BTIF_AV_RESET_REMOTE_STARTED_FLAG_EVT,
+  BTIF_AV_RESET_REMOTE_STARTED_FLAG_UPDATE_AUDIO_STATE_EVT,
   BTIF_AV_INIT_REQ_EVT,
   BTIF_AV_REINIT_AUDIO_IF,
 } btif_av_sm_event_t;
@@ -396,5 +399,14 @@ tBTA_AV_LATENCY btif_av_get_sink_latency();
 ********************************************************************************/
 void btif_av_peer_config_dump();
 
+/******************************************************************************
+**
+** Function         btif_av_get_current_playing_dev_idx()
+**
+** Description
+**
+** Returns
+********************************************************************************/
+int btif_av_get_current_playing_dev_idx();
 
 #endif /* BTIF_AV_H */

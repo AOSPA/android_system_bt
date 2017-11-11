@@ -150,14 +150,6 @@
 #endif
 
 /*******************************************************************************
- *  Local type definitions
- ******************************************************************************/
-typedef struct {
-  uint32_t num_devices;
-  bt_bdaddr_t devices[BTM_SEC_MAX_DEVICE_RECORDS];
-} btif_bonded_devices_t;
-
-/*******************************************************************************
  *  External functions
  ******************************************************************************/
 
@@ -169,8 +161,8 @@ extern void btif_gatts_add_bonded_dev_from_nv(BD_ADDR bda);
 
 static bt_status_t btif_in_fetch_bonded_ble_device(
     const char* remote_bd_addr, int add,
-    btif_bonded_devices_t* p_bonded_devices);
-static bt_status_t btif_in_fetch_bonded_device(const char* bdstr);
+    list_t** p_bonded_devices);
+static bt_status_t btif_in_fetch_bonded_device(const char* bdstr, int *dev_type);
 
 static bool btif_has_ble_keys(const char* bdstr);
 
@@ -181,6 +173,7 @@ static bool btif_has_ble_keys(const char* bdstr);
 static int prop2cfg(bt_bdaddr_t* remote_bd_addr, bt_property_t* prop) {
   bdstr_t bdstr = {0};
   int name_length = 0;
+  int dev_type = BT_DEVICE_TYPE_BREDR;
   if (remote_bd_addr) bdaddr_to_string(remote_bd_addr, bdstr, sizeof(bdstr));
   BTIF_TRACE_DEBUG("in, bd addr:%s, prop type:%d, len:%d", bdstr, prop->type,
                    prop->len);
@@ -262,8 +255,13 @@ static int prop2cfg(bt_bdaddr_t* remote_bd_addr, bt_property_t* prop) {
   }
 
   /* save changes if the device was bonded */
-  if (btif_in_fetch_bonded_device(bdstr) == BT_STATUS_SUCCESS) {
-    btif_config_flush();
+  if (btif_in_fetch_bonded_device(bdstr, &dev_type) == BT_STATUS_SUCCESS) {
+    // flush is expensive, avoid for BLE devices during BLE Scanning
+    if(dev_type == BT_DEVICE_TYPE_BREDR) {
+      btif_config_flush();
+    } else {
+      btif_config_save();
+    }
   }
 
   return true;
@@ -384,8 +382,9 @@ static int cfg2prop(bt_bdaddr_t* remote_bd_addr, bt_property_t* prop) {
  * Returns          BT_STATUS_SUCCESS if successful, BT_STATUS_FAIL otherwise
  *
  ******************************************************************************/
-static bt_status_t btif_in_fetch_bonded_device(const char* bdstr) {
+static bt_status_t btif_in_fetch_bonded_device(const char* bdstr, int *p_dev_type) {
   bool bt_linkkey_file_found = false;
+  bool bt_ltk_found = false;
 
   LINK_KEY link_key;
   size_t size = sizeof(link_key);
@@ -397,12 +396,17 @@ static bt_status_t btif_in_fetch_bonded_device(const char* bdstr) {
       bt_linkkey_file_found = false;
     }
   }
-  if ((btif_in_fetch_bonded_ble_device(bdstr, false, NULL) !=
-       BT_STATUS_SUCCESS) &&
-      (!bt_linkkey_file_found)) {
+
+  if (btif_in_fetch_bonded_ble_device(bdstr, false, NULL) == BT_STATUS_SUCCESS)
+    bt_ltk_found = true;
+
+  if(!bt_ltk_found && !bt_linkkey_file_found) {
     BTIF_TRACE_DEBUG("Remote device:%s, no link key or ble key found", bdstr);
     return BT_STATUS_FAIL;
+  } else {
+    btif_config_get_int(bdstr, "DevType", p_dev_type);
   }
+
   return BT_STATUS_SUCCESS;
 }
 
@@ -417,8 +421,7 @@ static bt_status_t btif_in_fetch_bonded_device(const char* bdstr) {
  *
  ******************************************************************************/
 static bt_status_t btif_in_fetch_bonded_devices(
-    btif_bonded_devices_t* p_bonded_devices, int add) {
-  memset(p_bonded_devices, 0, sizeof(btif_bonded_devices_t));
+    list_t** p_bonded_devices, int add) {
 
   bool bt_linkkey_file_found = false;
   int device_type;
@@ -453,8 +456,9 @@ static bt_status_t btif_in_fetch_bonded_devices(
           }
         }
         bt_linkkey_file_found = true;
-        memcpy(&p_bonded_devices->devices[p_bonded_devices->num_devices++],
-               &bd_addr, sizeof(bt_bdaddr_t));
+        bt_bdaddr_t *remote_addr =  (bt_bdaddr_t*)osi_malloc(sizeof(bt_bdaddr_t));
+        memcpy(remote_addr, &bd_addr, sizeof(bt_bdaddr_t));
+        list_append(*p_bonded_devices, remote_addr);
       } else {
         bt_linkkey_file_found = false;
       }
@@ -567,21 +571,27 @@ bt_status_t btif_storage_get_adapter_property(bt_property_t* property) {
     property->len = sizeof(bt_bdaddr_t);
     return BT_STATUS_SUCCESS;
   } else if (property->type == BT_PROPERTY_ADAPTER_BONDED_DEVICES) {
-    btif_bonded_devices_t bonded_devices;
+    list_t *bonded_devices = list_new(osi_free);
+    int len = 0;
 
     btif_in_fetch_bonded_devices(&bonded_devices, 0);
 
     BTIF_TRACE_DEBUG(
-        "%s: Number of bonded devices: %d "
+        "%s: Number of bonded devices: %zu "
         "Property:BT_PROPERTY_ADAPTER_BONDED_DEVICES",
-        __func__, bonded_devices.num_devices);
+        __func__, list_length(bonded_devices));
 
-    if (bonded_devices.num_devices > 0) {
-      property->len = bonded_devices.num_devices * sizeof(bt_bdaddr_t);
-      memcpy(property->val, bonded_devices.devices, property->len);
+    if (list_length(bonded_devices)) {
+      property->len = list_length(bonded_devices) * sizeof(bt_bdaddr_t);
+      for (list_node_t* node = list_begin(bonded_devices);
+        node != list_end(bonded_devices); node = list_next(node)) {
+        memcpy( &(property->val) + len, (bt_bdaddr_t *)list_node(node), sizeof(bt_bdaddr_t));
+        len = len + sizeof(bt_bdaddr_t);
+      }
     }
 
     /* if there are no bonded_devices, then length shall be 0 */
+    list_free(bonded_devices);
     return BT_STATUS_SUCCESS;
   } else if (property->type == BT_PROPERTY_UUIDS) {
     /* publish list of local supported services */
@@ -815,7 +825,7 @@ bt_status_t btif_storage_is_device_bonded(bt_bdaddr_t *remote_bd_addr) {
  *
  ******************************************************************************/
 bt_status_t btif_storage_load_bonded_devices(void) {
-  btif_bonded_devices_t bonded_devices;
+  list_t *bonded_devices = list_new(osi_free);
   uint32_t i = 0;
   bt_property_t adapter_props[6];
   uint32_t num_props = 0;
@@ -867,13 +877,15 @@ bt_status_t btif_storage_load_bonded_devices(void) {
 
     /* BONDED_DEVICES */
     bt_bdaddr_t* devices_list = (bt_bdaddr_t*)osi_malloc(
-        sizeof(bt_bdaddr_t) * bonded_devices.num_devices);
+        sizeof(bt_bdaddr_t) * list_length(bonded_devices));
     adapter_props[num_props].type = BT_PROPERTY_ADAPTER_BONDED_DEVICES;
     adapter_props[num_props].len =
-        bonded_devices.num_devices * sizeof(bt_bdaddr_t);
+        list_length(bonded_devices) * sizeof(bt_bdaddr_t);
     adapter_props[num_props].val = devices_list;
-    for (i = 0; i < bonded_devices.num_devices; i++) {
-      memcpy(devices_list + i, &bonded_devices.devices[i], sizeof(bt_bdaddr_t));
+    for (list_node_t* node = list_begin(bonded_devices);
+            node != list_end(bonded_devices); node = list_next(node)) {
+        memcpy(devices_list + i, (bt_bdaddr_t *)list_node(node), sizeof(bt_bdaddr_t));
+        i++;
     }
     num_props++;
 
@@ -888,11 +900,11 @@ bt_status_t btif_storage_load_bonded_devices(void) {
     osi_free(devices_list);
   }
 
-  BTIF_TRACE_EVENT("%s: %d bonded devices found", __func__,
-                   bonded_devices.num_devices);
-
+  BTIF_TRACE_EVENT("%s: %zu bonded devices found", __func__,
+                   list_length(bonded_devices));
   {
-    for (i = 0; i < bonded_devices.num_devices; i++) {
+     for (list_node_t* node = list_begin(bonded_devices);
+        node != list_end(bonded_devices); node = list_next(node)) {
       bt_bdaddr_t* p_remote_addr;
 
       /*
@@ -902,7 +914,8 @@ bt_status_t btif_storage_load_bonded_devices(void) {
       uint32_t devtype = 0;
 
       num_props = 0;
-      p_remote_addr = &bonded_devices.devices[i];
+      p_remote_addr = (bt_bdaddr_t *)list_node(node);
+
       memset(remote_properties, 0, sizeof(remote_properties));
       BTIF_STORAGE_GET_REMOTE_PROP(p_remote_addr, BT_PROPERTY_BDNAME, &name,
                                    sizeof(name), remote_properties[num_props]);
@@ -932,6 +945,7 @@ bt_status_t btif_storage_load_bonded_devices(void) {
                                  remote_properties);
     }
   }
+  list_free(bonded_devices);
   return BT_STATUS_SUCCESS;
 }
 
@@ -1146,7 +1160,7 @@ bt_status_t btif_storage_remove_ble_local_keys(void) {
 
 static bt_status_t btif_in_fetch_bonded_ble_device(
     const char* remote_bd_addr, int add,
-    btif_bonded_devices_t* p_bonded_devices) {
+    list_t** p_bonded_devices) {
   int device_type;
   int addr_type;
   bt_bdaddr_t bd_addr;
@@ -1190,8 +1204,9 @@ static bt_status_t btif_in_fetch_bonded_ble_device(
 
     // Fill in the bonded devices
     if (device_added) {
-      memcpy(&p_bonded_devices->devices[p_bonded_devices->num_devices++],
-             &bd_addr, sizeof(bt_bdaddr_t));
+      bt_bdaddr_t *remote_addr =  (bt_bdaddr_t*)osi_malloc(sizeof(bt_bdaddr_t));
+      memcpy(remote_addr, &bd_addr, sizeof(bt_bdaddr_t));
+      list_append(*p_bonded_devices, remote_addr);
       btif_gatts_add_bonded_dev_from_nv(bta_bd_addr);
     }
 
@@ -1279,6 +1294,7 @@ bt_status_t btif_storage_load_bonded_hid_info(void) {
   uint16_t attr_mask;
   uint8_t sub_class;
   uint8_t app_id;
+  int     dev_type;
 
   memset(&dscp_info, 0, sizeof(dscp_info));
   for (const btif_config_section_iter_t* iter = btif_config_section_begin();
@@ -1289,7 +1305,7 @@ bt_status_t btif_storage_load_bonded_hid_info(void) {
 
     BTIF_TRACE_DEBUG("Remote device:%s", name);
     int value;
-    if (btif_in_fetch_bonded_device(name) == BT_STATUS_SUCCESS) {
+    if (btif_in_fetch_bonded_device(name, &dev_type) == BT_STATUS_SUCCESS) {
       if (btif_config_get_int(name, "HidAttrMask", &value)) {
         attr_mask = (uint16_t)value;
 
@@ -1401,6 +1417,7 @@ bool btif_storage_is_restricted_device(const bt_bdaddr_t* remote_bd_addr) {
  ******************************************************************************/
 bt_status_t btif_storage_load_hidd(void) {
   bt_bdaddr_t bd_addr;
+  int         dev_type;
 
   for (const btif_config_section_iter_t* iter = btif_config_section_begin();
        iter != btif_config_section_end();
@@ -1410,7 +1427,7 @@ bt_status_t btif_storage_load_hidd(void) {
 
     BTIF_TRACE_DEBUG("Remote device:%s", name);
     int value;
-    if (btif_in_fetch_bonded_device(name) == BT_STATUS_SUCCESS) {
+    if (btif_in_fetch_bonded_device(name, &dev_type) == BT_STATUS_SUCCESS) {
       if (btif_config_get_int(name, "HidDeviceCabled", &value)) {
         string_to_bdaddr(name, &bd_addr);
         BTA_HdAddDevice(bd_addr.address);

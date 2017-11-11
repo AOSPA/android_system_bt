@@ -31,6 +31,7 @@
 #include "embdrv/sbc/encoder/include/sbc_encoder.h"
 #include "osi/include/log.h"
 #include "osi/include/osi.h"
+#include "btif/include/btif_a2dp_source.h"
 
 /* Buffer pool */
 #define A2DP_SBC_BUFFER_SIZE BT_DEFAULT_BUFFER_SIZE
@@ -114,6 +115,8 @@ typedef struct {
   a2dp_sbc_encoder_stats_t stats;
 } tA2DP_SBC_ENCODER_CB;
 
+bool enc_update_in_progress = FALSE;
+bool tx_enc_update_initiated = FALSE;
 static tA2DP_SBC_ENCODER_CB a2dp_sbc_encoder_cb;
 
 static void a2dp_sbc_encoder_update(uint16_t peer_mtu,
@@ -216,6 +219,9 @@ static void a2dp_sbc_encoder_update(uint16_t peer_mtu,
               __func__, a2dp_codec_config->name().c_str());
     return;
   }
+  enc_update_in_progress = TRUE;
+  LOG_DEBUG(LOG_TAG, "%s: Set flag enc_update_in_progress = %d", __func__, enc_update_in_progress);
+  tx_enc_update_initiated = TRUE;
   const uint8_t* p_codec_info = codec_info;
   min_bitpool = A2DP_GetMinBitpoolSbc(p_codec_info);
   max_bitpool = A2DP_GetMaxBitpoolSbc(p_codec_info);
@@ -378,6 +384,9 @@ static void a2dp_sbc_encoder_update(uint16_t peer_mtu,
   /* Reset entirely the SBC encoder */
   SBC_Encoder_Init(&a2dp_sbc_encoder_cb.sbc_encoder_params);
   a2dp_sbc_encoder_cb.tx_sbc_frames = calculate_max_frames_per_packet();
+  enc_update_in_progress = FALSE;
+  LOG_DEBUG(LOG_TAG, "%s:sbc encoder update done, enc_update_in_progress = %d",
+                      __func__, enc_update_in_progress);
 }
 
 void a2dp_sbc_encoder_cleanup(void) {

@@ -81,7 +81,11 @@ static const int BT_HCI_RT_PRIORITY = 1;
 
 // Abort if there is no response to an HCI command.
 static const uint32_t COMMAND_PENDING_TIMEOUT_MS = 2000;
-static const uint32_t COMMAND_TIMEOUT_RESTART_S = 5;
+#ifdef BLUEDROID_DEBUG
+static const uint32_t COMMAND_TIMEOUT_RESTART_S = 12;
+#else
+static const uint32_t COMMAND_TIMEOUT_RESTART_MS = 500;
+#endif
 
 // Our interface
 static bool interface_created;
@@ -360,16 +364,25 @@ static void event_finish_startup(UNUSED_ATTR void* context) {
   LOG_INFO(LOG_TAG, "%s", __func__);
   std::lock_guard<std::recursive_mutex> lock(commands_pending_response_mutex);
   alarm_cancel(startup_timer);
-  future_ready(startup_future, FUTURE_SUCCESS);
-  startup_future = NULL;
+  // added null check if startup_future has become null
+  // due to timer expiry
+  // eventually it will lead to command timeout incase timer expires
+  // before this call. IPC Logs will be collected as part of command
+  // timeout handling.
+  if(startup_future != NULL) {
+    future_ready(startup_future, FUTURE_SUCCESS);
+    startup_future = NULL;
+  }
 }
 
 static void startup_timer_expired(UNUSED_ATTR void* context) {
   LOG_ERROR(LOG_TAG, "%s", __func__);
 
   std::lock_guard<std::recursive_mutex> lock(commands_pending_response_mutex);
-  future_ready(startup_future, FUTURE_FAIL);
-  startup_future = NULL;
+  if(startup_future != NULL) {
+    future_ready(startup_future, FUTURE_FAIL);
+    startup_future = NULL;
+  }
 }
 
 // Command/packet transmitting functions
@@ -393,11 +406,12 @@ static void enqueue_command(waiting_command_t* wait_entry) {
 }
 
 static void event_command_ready(waiting_command_t* wait_entry) {
-  /// Move it to the list of commands awaiting response
-  std::lock_guard<std::recursive_mutex> lock(commands_pending_response_mutex);
-  wait_entry->timestamp = std::chrono::steady_clock::now();
-  list_append(commands_pending_response, wait_entry);
-
+  {
+    /// Move it to the list of commands awaiting response
+    std::lock_guard<std::recursive_mutex> lock(commands_pending_response_mutex);
+    wait_entry->timestamp = std::chrono::steady_clock::now();
+    list_append(commands_pending_response, wait_entry);
+  }
   // Send it off
   packet_fragmenter->fragment_and_dispatch(wait_entry->command);
 
@@ -502,8 +516,16 @@ static void command_timed_out(void* original_wait_entry) {
 
   osi_free(bt_hdr);
 
-  LOG_ERROR(LOG_TAG, "%s restarting the Bluetooth process.", __func__);
+#ifdef BLUEDROID_DEBUG
+  LOG_ERROR(LOG_TAG, "%s will restart the Bluetooth process after 0x%x seconds.",
+    __func__, COMMAND_TIMEOUT_RESTART_S);
   sleep(COMMAND_TIMEOUT_RESTART_S);
+#else
+  LOG_ERROR(LOG_TAG, "%s will restart the Bluetooth process after 0x%x millisecond.",
+    __func__, COMMAND_TIMEOUT_RESTART_MS);
+  usleep(COMMAND_TIMEOUT_RESTART_MS * 1000);
+#endif
+
   hci_close_firmware_log_file(hci_firmware_log_fd);
 
   // We shouldn't try to recover the stack from this command timeout.
@@ -551,8 +573,6 @@ static bool filter_incoming_event(BT_HDR* packet) {
 
     wait_entry = get_waiting_command(opcode);
 
-    process_command_credits(credits);
-
     if (!wait_entry) {
       if (opcode != HCI_COMMAND_NONE) {
         LOG_WARN(LOG_TAG,
@@ -569,6 +589,8 @@ static bool filter_incoming_event(BT_HDR* packet) {
       }
     }
 
+    process_command_credits(credits);
+
     goto intercepted;
   } else if (event_code == HCI_COMMAND_STATUS_EVT) {
     uint8_t status;
@@ -579,8 +601,6 @@ static bool filter_incoming_event(BT_HDR* packet) {
     // If a command generates a command status event, it won't be getting a
     // command complete event
     wait_entry = get_waiting_command(opcode);
-
-    process_command_credits(credits);
 
     if (!wait_entry) {
       LOG_WARN(
@@ -593,6 +613,8 @@ static bool filter_incoming_event(BT_HDR* packet) {
         wait_entry->status_callback(status, wait_entry->command,
                                     wait_entry->context);
     }
+
+    process_command_credits(credits);
 
     goto intercepted;
   } else if (event_code == HCI_VSE_SUBCODE_DEBUG_INFO_SUB_EVT) {

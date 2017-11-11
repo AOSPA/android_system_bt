@@ -586,6 +586,12 @@ tBTM_STATUS BTM_SwitchRole(BD_ADDR remote_bd_addr, uint8_t new_role,
   tBTM_PM_PWR_MD settings;
   BD_ADDR_PTR p_bda;
 
+#if (BTM_SCO_INCLUDED == TRUE)
+    /* Check if there is any SCO Active on this BD Address */
+    is_sco_active = btm_is_sco_active_by_bdaddr(remote_bd_addr);
+    if (is_sco_active == true) return (BTM_NO_RESOURCES);
+#endif
+
   /* Make sure the local/remote devices supports switching */
   if (!btm_dev_support_switch(remote_bd_addr))
     return(BTM_MODE_UNSUPPORTED);
@@ -609,13 +615,6 @@ tBTM_STATUS BTM_SwitchRole(BD_ADDR remote_bd_addr, uint8_t new_role,
                 INTEROP_DISABLE_ROLE_SWITCH, (bt_bdaddr_t *)&remote_address)) ||
                 (!btm_cb.is_wifi_connected && (btm_get_bredr_acl_count() <= 1)))
       return(BTM_SUCCESS);
-
-#if (BTM_SCO_INCLUDED == TRUE)
-  /* Check if there is any SCO Active on this BD Address */
-  is_sco_active = btm_is_sco_active_by_bdaddr(remote_bd_addr);
-
-  if (is_sco_active == true) return (BTM_NO_RESOURCES);
-#endif
 
   /* Ignore role switch request if the previous request was not completed */
   if (p->switch_role_state != BTM_ACL_SWKEY_STATE_IDLE) {
@@ -1017,6 +1016,15 @@ void btm_process_remote_ext_features(tACL_CONN* p_acl_cb,
     memcpy(p_dev_rec->feature_pages[page_idx],
            p_acl_cb->peer_lmp_feature_pages[page_idx],
            HCI_FEATURE_BYTES_PER_PAGE);
+  }
+
+  if (p_dev_rec->sec_flags & BTM_SEC_NAME_KNOWN) {
+    /* Name is know, unset it so that name is retrieved again
+     * from security procedure. This will ensure, that if remote device
+     * has updated its name since last connection, we will have
+     * update name of remote device. */
+    p_dev_rec->sec_flags &= ~BTM_SEC_NAME_KNOWN;
+    p_dev_rec->sec_bd_name[0] = '\0';
   }
 
   if (!(p_dev_rec->sec_flags & BTM_SEC_NAME_KNOWN) || p_dev_rec->is_originator) {
@@ -2525,7 +2533,7 @@ void btm_acl_paging(BT_HDR* p, BD_ADDR bda) {
           (btm_cb.connecting_bda[3] << 16) + (btm_cb.connecting_bda[4] << 8) +
               btm_cb.connecting_bda[5]);
       if (btm_cb.paging &&
-          memcmp(bda, btm_cb.connecting_bda, BD_ADDR_LEN) != 0) {
+          memcmp(bda, btm_cb.connecting_bda, BD_ADDR_LEN) == 0) {
         fixed_queue_enqueue(btm_cb.page_queue, p);
       } else {
         p_dev_rec = btm_find_or_alloc_dev(bda);
