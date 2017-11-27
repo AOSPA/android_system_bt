@@ -1070,9 +1070,11 @@ void bta_av_co_get_peer_params(tA2DP_ENCODER_INIT_PEER_PARAMS* p_peer_params) {
   index = btif_av_get_current_playing_dev_idx();
   if ((index < btif_max_av_clients) && (!btif_av_is_multicast_supported())) {
     p_peer = &bta_av_co_cb.peers[index];
-    APPL_TRACE_DEBUG("%s updating peer MTU to %d for index %d",
-                                    __func__, p_peer->mtu, index);
     min_mtu = p_peer->mtu;
+    if (min_mtu > BTA_AV_MAX_A2DP_MTU)
+        min_mtu = BTA_AV_MAX_A2DP_MTU;
+    APPL_TRACE_DEBUG("%s updating peer MTU to %d for index %d",
+                                    __func__, min_mtu, index);
   }
 
   p_peer_params->peer_mtu = min_mtu;
@@ -1379,6 +1381,7 @@ bt_status_t bta_av_set_a2dp_current_codec(tBTA_AV_HNDL hndl) {
 void bta_av_co_init(
     const std::vector<btav_a2dp_codec_config_t>& codec_priorities) {
   APPL_TRACE_DEBUG("%s", __func__);
+  bt_bdaddr_t bt_addr;
   char value[PROPERTY_VALUE_MAX] = {'\0'};
   /* Reset the control block */
   bta_av_co_cb.reset();
@@ -1410,5 +1413,6 @@ void bta_av_co_init(
 
   // NOTE: Unconditionally dispatch the event to make sure a callback with
   // the most recent codec info is generated.
-  btif_dispatch_sm_event(BTIF_AV_SOURCE_CONFIG_UPDATED_EVT, NULL, 0);
+  bdcpy(bt_addr.address, bd_addr_any);
+  btif_dispatch_sm_event(BTIF_AV_SOURCE_CONFIG_UPDATED_EVT, &bt_addr, sizeof(bt_bdaddr_t));
 }

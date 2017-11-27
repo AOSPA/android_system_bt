@@ -3966,18 +3966,25 @@ void btm_sec_auth_complete(uint16_t handle, uint8_t status) {
       (memcmp(p_dev_rec->bd_addr, btm_cb.pairing_bda, BD_ADDR_LEN) == 0))
     are_bonding = true;
 
-  if ((btm_cb.pairing_state != BTM_PAIR_STATE_IDLE) &&
-      (memcmp(p_dev_rec->bd_addr, btm_cb.pairing_bda, BD_ADDR_LEN) == 0))
-    btm_sec_change_pairing_state(BTM_PAIR_STATE_IDLE);
-
   if (p_dev_rec->sec_state != BTM_SEC_STATE_AUTHENTICATING) {
-    if ((btm_cb.api.p_auth_complete_callback && status != HCI_SUCCESS) &&
+
+     p_dev_rec->sec_state = BTM_SEC_STATE_IDLE;
+     if ( (btm_cb.pairing_state != BTM_PAIR_STATE_IDLE)
+      && (memcmp (p_dev_rec->bd_addr, btm_cb.pairing_bda, BD_ADDR_LEN) == 0) )
+        btm_sec_change_pairing_state (BTM_PAIR_STATE_IDLE);
+
+     if ((btm_cb.api.p_auth_complete_callback && status != HCI_SUCCESS) &&
         (old_state != BTM_PAIR_STATE_IDLE)) {
       (*btm_cb.api.p_auth_complete_callback)(p_dev_rec->bd_addr,
                                              p_dev_rec->dev_class,
                                              p_dev_rec->sec_bd_name, status);
     }
     return;
+  } else {
+    p_dev_rec->sec_state = BTM_SEC_STATE_IDLE;
+    if ( (btm_cb.pairing_state != BTM_PAIR_STATE_IDLE)
+     && (memcmp (p_dev_rec->bd_addr, btm_cb.pairing_bda, BD_ADDR_LEN) == 0) )
+      btm_sec_change_pairing_state (BTM_PAIR_STATE_IDLE);
   }
 
   /* There can be a race condition, when we are starting authentication and
@@ -4272,6 +4279,7 @@ static void btm_sec_connect_after_reject_timeout(UNUSED_ATTR void* data) {
 
   BTM_TRACE_EVENT("%s", __func__);
   btm_cb.p_collided_dev_rec = 0;
+  btm_cb.collision_start_time = 0;
 
   if (btm_sec_dd_create_conn(p_dev_rec) != BTM_CMD_STARTED) {
     BTM_TRACE_WARNING("Security Manager: %s: failed to start connection",
