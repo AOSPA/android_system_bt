@@ -2780,10 +2780,9 @@ static uint8_t bta_dm_sp_cback(tBTM_SP_EVT event, tBTM_SP_EVT_DATA* p_data) {
         unlikely to receive key request, so skip this event */
     /*case BTM_SP_KEY_REQ_EVT: */
     case BTM_SP_KEY_NOTIF_EVT:
-      bta_dm_cb.num_val = sec_event.key_notif.passkey =
-          p_data->key_notif.passkey;
 
       if (BTM_SP_CFM_REQ_EVT == event) {
+        bta_dm_cb.num_val = sec_event.key_notif.passkey = p_data->cfm_req.num_val;
         /* Due to the switch case falling through below to BTM_SP_KEY_NOTIF_EVT,
            call remote name request using values from cfm_req */
         if (p_data->cfm_req.bd_name[0] == 0) {
@@ -2814,6 +2813,7 @@ static uint8_t bta_dm_sp_cback(tBTM_SP_EVT event, tBTM_SP_EVT_DATA* p_data) {
       }
 
       if (BTM_SP_KEY_NOTIF_EVT == event) {
+        bta_dm_cb.num_val = sec_event.key_notif.passkey = p_data->key_notif.passkey;
         /* If the device name is not known, save bdaddr and devclass
            and initiate a name request with values from key_notif */
         if (p_data->key_notif.bd_name[0] == 0) {
@@ -4902,7 +4902,10 @@ static void bta_dm_gattc_callback(tBTA_GATTC_EVT event, tBTA_GATTC* p_data) {
       break;
 
     case BTA_GATTC_CLOSE_EVT:
-      APPL_TRACE_DEBUG("BTA_GATTC_CLOSE_EVT reason = %d", p_data->close.reason);
+      APPL_TRACE_DEBUG("BTA_GATTC_CLOSE_EVT reason = %d, data conn_id %d, search conn_id %d",
+                       p_data->close.reason,p_data->close.conn_id,bta_dm_search_cb.conn_id);
+       if(p_data->close.conn_id == bta_dm_search_cb.conn_id)
+          bta_dm_search_cb.conn_id = BTA_GATT_INVALID_CONN_ID;
       /* in case of disconnect before search is completed */
       if ((bta_dm_search_cb.state != BTA_DM_SEARCH_IDLE) &&
           (bta_dm_search_cb.state != BTA_DM_SEARCH_ACTIVE) &&

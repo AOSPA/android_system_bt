@@ -127,6 +127,11 @@ bool l2c_link_hci_conn_req(BD_ADDR bd_addr) {
     else
       p_lcb->link_role = l2cu_get_conn_role(p_lcb);
 
+    bdcpy(remote_bdaddr.address, bd_addr);
+    if ((p_lcb->link_role == BTM_ROLE_MASTER)&&(interop_database_match_addr(INTEROP_DISABLE_ROLE_SWITCH, (bt_bdaddr_t *)&remote_bdaddr))) {
+      p_lcb->link_role = BTM_ROLE_SLAVE;
+      L2CAP_TRACE_WARNING ("l2c_link_hci_conn_req:set link_role= %d",p_lcb->link_role);
+    }
     btsnd_hcic_accept_conn(bd_addr, p_lcb->link_role);
 
     p_lcb->link_state = LST_CONNECTING;
@@ -438,10 +443,10 @@ bool l2c_link_hci_disc_comp(uint16_t handle, uint8_t reason) {
                   p_lcb->link_role, p_lcb->is_bonding, p_lcb->disc_reason,
                   p_lcb->transport);
             }
-            CHECK(p_lcb->p_fixed_ccbs[xx] != NULL);
-            l2cu_release_ccb(p_lcb->p_fixed_ccbs[xx]);
-
-            p_lcb->p_fixed_ccbs[xx] = NULL;
+            if (p_lcb->p_fixed_ccbs[xx] != NULL) {
+              l2cu_release_ccb(p_lcb->p_fixed_ccbs[xx]);
+              p_lcb->p_fixed_ccbs[xx] = NULL;
+            }
           }
         }
 #endif
