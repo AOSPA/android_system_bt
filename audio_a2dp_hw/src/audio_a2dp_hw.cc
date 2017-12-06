@@ -1328,14 +1328,14 @@ size_t audio_a2dp_hw_stream_compute_buffer_size(
 static uint32_t out_get_channels(const struct audio_stream* stream) {
   struct a2dp_stream_out* out = (struct a2dp_stream_out*)stream;
 
-  INFO("channels 0x%" PRIx32, out->common.cfg.channel_mask);
+  //INFO("channels 0x%" PRIx32, out->common.cfg.channel_mask);
 
   return out->common.cfg.channel_mask;
 }
 
 static audio_format_t out_get_format(const struct audio_stream* stream) {
   struct a2dp_stream_out* out = (struct a2dp_stream_out*)stream;
-  INFO("format 0x%x", out->common.cfg.format);
+  //INFO("format 0x%x", out->common.cfg.format);
   return (audio_format_t)out->common.cfg.format;
 }
 
