@@ -2343,9 +2343,7 @@ static bt_status_t get_play_status_rsp(bt_bdaddr_t* bd_addr,
   {
       BTIF_TRACE_ERROR("%s: clear remote suspend flag: %d",__FUNCTION__, av_index);
       btif_av_clear_remote_suspend_flag();
-#ifdef ENABLE_SPLIT_A2DP
       btif_dispatch_sm_event(BTIF_AV_START_STREAM_REQ_EVT, NULL, 0);
-#endif // ENABLE_SPLIT_A2DP
   }
 
   avrc_rsp.get_play_status.pdu = AVRC_PDU_GET_PLAY_STATUS;
@@ -2728,9 +2726,7 @@ static bt_status_t register_notification_rsp_sho_mcast(
           (btif_av_check_flag_remote_suspend(av_index))) {
           BTIF_TRACE_ERROR("%s: clear remote suspend flag: %d",__FUNCTION__,av_index );
           btif_av_clear_remote_suspend_flag();
-#ifdef ENABLE_SPLIT_A2DP
           btif_dispatch_sm_event(BTIF_AV_START_STREAM_REQ_EVT, NULL, 0);
-#endif // ENABLE_SPLIT_A2DP
       }
       break;
     case BTRC_EVT_TRACK_CHANGE:
@@ -2841,9 +2837,7 @@ static bt_status_t register_notification_rsp(
         {
             BTIF_TRACE_ERROR("%s: clear remote suspend flag: %d",__FUNCTION__,av_index );
             btif_av_clear_remote_suspend_flag();
-#ifdef ENABLE_SPLIT_A2DP
             btif_dispatch_sm_event(BTIF_AV_START_STREAM_REQ_EVT, NULL, 0);
-#endif // ENABLE_SPLIT_A2DP
         }
         break;
       case BTRC_EVT_TRACK_CHANGE:
