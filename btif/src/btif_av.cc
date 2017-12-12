@@ -1640,10 +1640,8 @@ static bool btif_av_state_started_handler(btif_sm_event_t event, void* p_data,
 #endif
       // Clear Dual Handoff for all SCBs for DUT initiated Start.
       //If split a2dp is enabled, clear dual handoff flag in offload resp evt.
-#ifdef ENABLE_SPLIT_A2DP
       if ((!btif_av_is_split_a2dp_enabled()) &&
                     (!(btif_av_cb[index].remote_started))) {
-#endif // ENABLE_SPLIT_A2DP
         for(i = 0; i < btif_max_av_clients; i++) {
           btif_av_cb[i].dual_handoff = false;
           // Other device is not current playing
@@ -1657,9 +1655,7 @@ static bool btif_av_state_started_handler(btif_sm_event_t event, void* p_data,
       } else {
           BTIF_TRACE_IMP("%s Remote Start, Not updating current playing for index = %d",
                                           __func__, index);
-#ifdef ENABLE_SPLIT_A2DP
       }
-#endif // ENABLE_SPLIT_A2DP
       break;
 
     case BTIF_SM_EXIT_EVT:
@@ -3478,7 +3474,9 @@ bt_status_t btif_av_execute_service(bool b_enable) {
           BTIF_TRACE_DEBUG("Moving State from opened/started to Idle due to BT ShutDown");
           if (btif_av_is_split_a2dp_enabled()) {
             btif_a2dp_audio_interface_deinit();
+#ifdef ENABLE_SPLIT_A2DP
             btif_a2dp_audio_if_init = false;
+#endif // ENABLE_SPLIT_A2DP
           }else{
              btif_sm_change_state(btif_av_cb[i].sm_handle, BTIF_AV_STATE_IDLE);
              btif_queue_advance();
