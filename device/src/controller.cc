@@ -22,6 +22,7 @@
 
 #include <base/logging.h>
 
+#include "bt_target.h"
 #include "bt_types.h"
 #include "btcore/include/event_mask.h"
 #include "btcore/include/module.h"
